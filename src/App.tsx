@@ -1,9 +1,10 @@
+import { useRoutes } from 'react-router-dom';
+import { routes } from '@/app/router';
+import { RootLayout } from '@/components/layout/root-layout';
+
 export function App() {
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="font-medium">Hello World</div>
-    </div>
-  )
+  const element = useRoutes(routes);
+  return <RootLayout>{element}</RootLayout>;
 }
 
-export default App
+export default App;
