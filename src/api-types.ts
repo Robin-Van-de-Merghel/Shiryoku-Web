@@ -35,6 +35,20 @@ export interface NmapPortDocument {
   scripts?: NmapScriptResult[];
 }
 
+/**
+ * Represents a single host result from an Nmap scan.
+ */
+export interface NmapHostDocument {
+  host_id?: string;
+  host?: string;
+  comment?: string;
+  addresses?: string[];
+  hostnames?: string[];
+  host_status?: string;
+  os_name?: string;
+  os_accuracy?: number;
+}
+
 export interface NmapScriptResult {
   id: string;
   output: string;
@@ -124,7 +138,32 @@ function getHeaders() {
 export async function searchPorts(
   params: SearchParams
 ): Promise<SearchResult<NmapPortDocument>> {
-  const response = await fetch(`${API_BASE}/modules/nmap/search`, {
+  const response = await fetch(`${API_BASE}/modules/nmap/search/ports`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `API error: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Search for Nmap hosts documents with filtering, sorting, and pagination.
+ * 
+ * @param params - Search parameters including filters, sort, and pagination
+ * @returns Promise resolving to paginated search results
+ * @throws Error if the API request fails
+ */
+export async function searchHosts(
+  params: SearchParams
+): Promise<SearchResult<NmapHostDocument>> {
+  const response = await fetch(`${API_BASE}/modules/nmap/search/hosts`, {
     method: "POST",
     headers: getHeaders(),
     body: JSON.stringify(params),

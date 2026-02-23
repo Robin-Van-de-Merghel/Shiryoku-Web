@@ -1,12 +1,5 @@
 /**
  * Main dashboard page for browsing and filtering Nmap port scan results
- * 
- * Features:
- * - Displays KPI statistics at the top
- * - Full-text search by service name
- * - Sortable results (newest/oldest)
- * - Paginated table with detailed port information
- * - Responsive layout
  */
 
 import { useState, useEffect } from "react";
@@ -23,18 +16,18 @@ import {
 import { Users, Target, Network, Search as SearchIcon } from "lucide-react";
 import { DataTable } from "@/components/data-table/data-table";
 import { StatCard } from "@/components/stat-card/stat-card";
-import { portColumns } from "@/features/ports/columns";
+import { hostColumns } from "@/features/hosts/columns";
 import {
-  NmapPortDocument,
+  NmapHostDocument,
   SearchParams,
   SearchResult,
   fetchStats,
-  searchPorts,
+  searchHosts,
 } from "@/api-types";
 
 export function Dashboard() {
-  // === State Management ===
-  const [ports, setPorts] = useState<NmapPortDocument[]>([]);
+  // State Management
+  const [hosts, setHosts] = useState<NmapHostDocument[]>([]);
   const [stats, setStats] = useState({
     totalHosts: 0,
     totalScans: 0,
@@ -59,12 +52,12 @@ export function Dashboard() {
   }, []);
 
   /**
-   * Fetch ports with applied filters
+   * Fetch hosts with applied filters
    * 
    * @param page - Page number (1-indexed)
    * @param query - Search query string
    */
-  const fetchPorts = async (page: number, query: string = "") => {
+  const fetchHosts = async (page: number, query: string = "") => {
     setIsLoading(true);
     try {
       // Build SearchParams matching the backend structure
@@ -73,32 +66,27 @@ export function Dashboard() {
       const searchParams: SearchParams = {
         page: page - 1, // Convert to 0-indexed for API
         per_page: pageSize,
-        sort: [
-          {
-            parameter: "port",
-            direction: sortBy === "newest" ? "desc" : "asc",
-          },
-        ],
+        search: []
       };
 
       // Only add search filter if query is not empty
       if (query) {
         searchParams.search = [
           {
-            parameter: "service_name",
-            operator: "like",
+            parameter: "host",
+            operator: "eq",
             value: query,
           } as any,
         ];
       }
 
-      const result: SearchResult<NmapPortDocument> = await searchPorts(
+      const result: SearchResult<NmapHostDocument> = await searchHosts(
         searchParams
       );
-      setPorts(result.results);
+      setHosts(result.results);
       setTotalCount(result.total);
     } catch (error) {
-      console.error("Failed to fetch ports:", error);
+      console.error("Failed to fetch hosts:", error);
       // TODO: Display toast error notification
     } finally {
       setIsLoading(false);
@@ -109,7 +97,7 @@ export function Dashboard() {
    * Initial data load on mount
    */
   useEffect(() => {
-    fetchPorts(1, searchQuery);
+    fetchHosts(1, searchQuery);
   }, []);
 
   /**
@@ -117,7 +105,7 @@ export function Dashboard() {
    */
   const handleSearch = () => {
     setCurrentPage(1);
-    fetchPorts(1, searchQuery);
+    fetchHosts(1, searchQuery);
   };
 
   /**
@@ -125,7 +113,7 @@ export function Dashboard() {
    */
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    fetchPorts(page, searchQuery);
+    fetchHosts(page, searchQuery);
   };
 
   /**
@@ -134,7 +122,7 @@ export function Dashboard() {
   const handleSortChange = (direction: "newest" | "oldest") => {
     setSortBy(direction);
     setCurrentPage(1);
-    fetchPorts(1, searchQuery);
+    fetchHosts(1, searchQuery);
   };
 
   return (
@@ -163,13 +151,13 @@ export function Dashboard() {
         />
       </div>
 
-      {/* Ports Results Section */}
+      {/* Hosts Results Section */}
       <Card className="dark:bg-slate-900 dark:border-slate-700">
         <CardHeader>
           {/* Section header with subtitle */}
           <div className="flex items-center justify-between">
-            <CardTitle className="dark:text-white">Last found ports</CardTitle>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Active ports</p>
+            <CardTitle className="dark:text-white">Last scanned hosts</CardTitle>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Active scanning</p>
           </div>
 
           {/* Search and Filter Controls */}
@@ -177,7 +165,7 @@ export function Dashboard() {
             <div className="flex-1 flex gap-2">
               {/* Search input */}
               <Input
-                placeholder="Search by service name..."
+                placeholder="Search by host ip..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -213,8 +201,8 @@ export function Dashboard() {
         <CardContent>
           {/* Data table with pagination and sorting */}
           <DataTable
-            columns={portColumns}
-            data={ports}
+            columns={hostColumns}
+            data={hosts}
             totalCount={totalCount}
             isLoading={isLoading}
             currentPage={currentPage}
