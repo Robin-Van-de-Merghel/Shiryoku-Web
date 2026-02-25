@@ -61,7 +61,20 @@ export const hostColumns: ColumnDef<NmapHostDocument>[] = [
   {
     accessorKey: "hostnames",
     header: "Hostnames",
-    cell: ({ row }) => (row.getValue("hostnames") as string[])[0] || "—",
+    cell: ({ row }) => {
+    const hostnames = row.getValue("hostnames") as string[];
+    if (!hostnames?.length) return "—";
+
+    return (
+      <div className="flex flex-wrap gap-1">
+        {hostnames.map((name) => (
+          <Badge key={name} className="bg-blue-100 text-blue-800">
+            {name}
+          </Badge>
+        ))}
+      </div>
+    );
+  },
   },
   {
     accessorKey: "host_status",
@@ -71,8 +84,8 @@ export const hostColumns: ColumnDef<NmapHostDocument>[] = [
     ),
   },
   {
-    accessorKey: "os_name",
-    header: "OS",
-    cell: ({ row }) => row.getValue("os_name") || "—",
+    accessorKey: "comment",
+    header: "Comment",
+    cell: ({ row }) => row.getValue("comment") || "—",
   }
 ];

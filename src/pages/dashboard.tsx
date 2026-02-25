@@ -1,49 +1,31 @@
-/**
- * Main dashboard page for browsing and filtering Nmap port scan results
- */
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Users, Target, Network, Search as SearchIcon } from "lucide-react";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { Users, Target, Network } from "lucide-react";
 import { DataTable } from "@/components/data-table/data-table";
 import { StatCard } from "@/components/stat-card/stat-card";
-import { hostColumns } from "@/features/hosts/columns";
+import { dashboardWidgetColumns } from "@/features/dashboard-widget/columns";
 import {
-  NmapHostDocument,
+  DashboardWidgetScan,
   SearchParams,
   SearchResult,
   fetchStats,
-  searchHosts,
+  searchDashboardWidget,
 } from "@/api-types";
 
 export function Dashboard() {
-  // State Management
-  const [hosts, setHosts] = useState<NmapHostDocument[]>([]);
-  const [stats, setStats] = useState({
-    totalHosts: 0,
-    totalScans: 0,
-    differentServices: 0,
-  });
-  const [isLoading, setIsLoading] = useState(false);
+  const [scans, setScans] = useState<DashboardWidgetScan[]>([]);
+  const [filteredScans, setFilteredScans] = useState<DashboardWidgetScan[]>([]);
+  const [stats, setStats] = useState({ totalHosts: 0, totalScans: 0, differentServices: 0 });
+  const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [ignoreNoOpenPorts, setIgnoreNoOpenPorts] = useState(true);
 
   const pageSize = 10;
 
-  /**
-   * Load dashboard statistics on component mount
-   */
   useEffect(() => {
     (async () => {
       const data = await fetchStats();
@@ -51,142 +33,84 @@ export function Dashboard() {
     })();
   }, []);
 
-  /**
-   * Fetch hosts with applied filters
-   * 
-   * @param page - Page number (1-indexed)
-   * @param query - Search query string
-   */
-  const fetchHosts = async (page: number, query: string = "") => {
+  useEffect(() => {
+    if (ignoreNoOpenPorts) {
+      setFilteredScans(scans.filter((s) => s.ports && s.ports.length > 0));
+    } else {
+      setFilteredScans(scans);
+    }
+  }, [scans, ignoreNoOpenPorts]);
+
+  const fetchDashboardWidget = async (page: number) => {
     setIsLoading(true);
     try {
-      // Build SearchParams matching the backend structure
-      // Only include necessary fields: page, per_page, sort
-      // Search filter is optional - only add if query exists
       const searchParams: SearchParams = {
-        page: page - 1, // Convert to 0-indexed for API
+        page,
         per_page: pageSize,
-        search: []
+        sort: [{ parameter: "scan_start", direction: sortBy === "newest" ? "desc" : "asc" }],
+        search: [],
       };
 
-      // Only add search filter if query is not empty
-      if (query) {
-        searchParams.search = [
-          {
-            parameter: "host",
-            operator: "eq",
-            value: query,
-          } as any,
-        ];
+      if (ignoreNoOpenPorts) {
+        searchParams?.search?.push({ parameter: "port_number", operator: "gt", value: 0 });
       }
 
-      const result: SearchResult<NmapHostDocument> = await searchHosts(
-        searchParams
-      );
-      setHosts(result.results);
+      const result: SearchResult<DashboardWidgetScan> = await searchDashboardWidget(searchParams);
+
+      // **Map PGPorts -> ports**
+      const mapped = result.results.map((r) => ({
+        ...r,
+        ports: r.ports || [],
+      }));
+
+      setScans(mapped);
       setTotalCount(result.total);
-    } catch (error) {
-      console.error("Failed to fetch hosts:", error);
-      // TODO: Display toast error notification
     } finally {
       setIsLoading(false);
     }
   };
 
-  /**
-   * Initial data load on mount
-   */
   useEffect(() => {
-    fetchHosts(1, searchQuery);
-  }, []);
+    fetchDashboardWidget(1);
+  }, [sortBy, ignoreNoOpenPorts]);
 
-  /**
-   * Handle search form submission
-   */
-  const handleSearch = () => {
-    setCurrentPage(1);
-    fetchHosts(1, searchQuery);
-  };
-
-  /**
-   * Handle pagination
-   */
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    fetchHosts(page, searchQuery);
+    fetchDashboardWidget(page);
   };
 
-  /**
-   * Handle sort direction change
-   */
   const handleSortChange = (direction: "newest" | "oldest") => {
     setSortBy(direction);
     setCurrentPage(1);
-    fetchHosts(1, searchQuery);
   };
 
   return (
     <div className="p-6 space-y-6">
-      {/* Page Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
       </div>
 
-      {/* Key Performance Indicators */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          title="Total Hosts"
-          value={stats.totalHosts.toLocaleString()}
-          icon={<Users />}
-        />
-        <StatCard
-          title="Total Scans"
-          value={stats.totalScans.toLocaleString()}
-          icon={<Target />}
-        />
-        <StatCard
-          title="Different Services"
-          value={stats.differentServices}
-          icon={<Network />}
-        />
+        <StatCard title="Total Hosts" value={stats.totalHosts.toLocaleString()} icon={<Users />} />
+        <StatCard title="Total Scans" value={stats.totalScans.toLocaleString()} icon={<Target />} />
+        <StatCard title="Different Services" value={stats.differentServices.toLocaleString()} icon={<Network />} />
       </div>
 
-      {/* Hosts Results Section */}
       <Card className="dark:bg-slate-900 dark:border-slate-700">
-        <CardHeader>
-          {/* Section header with subtitle */}
+        <CardHeader className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <CardTitle className="dark:text-white">Last scanned hosts</CardTitle>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Active scanning</p>
           </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant={ignoreNoOpenPorts ? "default" : "outline"}
+              onClick={() => setIgnoreNoOpenPorts(!ignoreNoOpenPorts)}
+              className={ignoreNoOpenPorts ? "bg-red-600 hover:bg-red-700 text-white" : "text-gray-700 dark:text-gray-300"}
+            >
+              Ignore devices with no open port
+            </Button>
 
-          {/* Search and Filter Controls */}
-          <div className="flex items-center gap-3 mt-4">
-            <div className="flex-1 flex gap-2">
-              {/* Search input */}
-              <Input
-                placeholder="Search by host ip..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSearch();
-                }}
-                className="flex-1 dark:bg-slate-800 dark:border-slate-600 dark:text-white"
-              />
-              {/* Search submit button */}
-              <Button
-                onClick={handleSearch}
-                variant="outline"
-                size="icon"
-                disabled={isLoading}
-                className="dark:border-slate-600 dark:hover:bg-slate-800"
-              >
-                <SearchIcon className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Sort dropdown */}
-            <Select value={sortBy} onValueChange={handleSortChange}>
+            <Select value={sortBy} onValueChange={(v) => handleSortChange(v as "newest" | "oldest")}>
               <SelectTrigger className="w-40 dark:bg-slate-800 dark:border-slate-600 dark:text-white">
                 <SelectValue />
               </SelectTrigger>
@@ -199,10 +123,9 @@ export function Dashboard() {
         </CardHeader>
 
         <CardContent>
-          {/* Data table with pagination and sorting */}
           <DataTable
-            columns={hostColumns}
-            data={hosts}
+            columns={dashboardWidgetColumns}
+            data={filteredScans}
             totalCount={totalCount}
             isLoading={isLoading}
             currentPage={currentPage}

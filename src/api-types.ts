@@ -49,6 +49,18 @@ export interface NmapHostDocument {
   os_accuracy?: number;
 }
 
+/**
+ * Represents a single host result for the dashboard widget.
+ */
+export interface DashboardWidgetScan {
+  scan_id?: string;
+  scan_start?: string;
+  host?: string;
+  host_id?: string;
+  hostnames?: string[];
+  ports?: number[]
+}
+
 export interface NmapScriptResult {
   id: string;
   output: string;
@@ -178,6 +190,32 @@ export async function searchHosts(
   return response.json();
 }
 
+
+/**
+ * Search for the dashboard widget data.
+ * 
+ * @param params - Search parameters including filters, sort, and pagination
+ * @returns Promise resolving to paginated search results
+ * @throws Error if the API request fails
+ */
+export async function searchDashboardWidget(
+  params: SearchParams
+): Promise<SearchResult<DashboardWidgetScan>> {
+  const response = await fetch(`${API_BASE}/widgets/dashboard/search`, {
+    method: "POST",
+    headers: getHeaders(),
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `API error: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
 /**
  * Fetch dashboard statistics.
  * TODO: Replace with actual API endpoint once available.
@@ -190,3 +228,4 @@ export async function fetchStats() {
     differentServices: 189,
   };
 }
+
